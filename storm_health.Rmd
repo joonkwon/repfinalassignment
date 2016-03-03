@@ -17,7 +17,7 @@ str(storm.data)
 
 We are going to look at health and economic impacts of each events arcoss US. So we will need only a few columns from the data -  FATALITIES, INJURIES, PROPDMG, PROPDMGEXP, CROPDMG, CROPDMGEXP. We will also select Date information - we chose BGN_DATE - along with event type - EVTYPE.
 
-Also column types are modified. We created a date column, the info of which is coming from BGN_DATE column. Also EVTTYPE column becomes factor.
+Also column types are modified. We created a date column, the info of which is coming from BGN_DATE column. From this date colume, year column is created. Also EVTTYPE column becomes factor.
 
 ```{r cache=TRUE}
 columns <- c(2,8,23:28)
@@ -25,6 +25,7 @@ storm <- storm.data[,columns]
 str(storm)
 
 storm$date <- as.Date(storm$BGN_DATE, "%m/%d/%Y %H:%M:%S")
+storm$year <- strftime(storm$date, "%Y")
 storm$EVTYPE <- as.factor(storm$EVTYPE)
 ```
 
@@ -40,6 +41,7 @@ storm <- transform(storm, CROPDMG = ifelse(CROPDMGEXP == "K", CROPDMG * 1E3,
                                            ifelse(CROPDMGEXP == "M", CROPDMG * 1E6, 
                                                   ifelse(CROPDMGEXP == "B", 
                                                          CROPDMG * 1E9, CROPDMG))))
-storm <- subset(storm, select = c("date", "EVTYPE", "FATALITIES", "INJURIES", "PROPDMG", "CROPDMG"))
+storm <- subset(storm, select = c("date", "year", "EVTYPE", "FATALITIES", "INJURIES", "PROPDMG", "CROPDMG"))
+storm$total.dmg <- storm$PROPDMG + storm$CROPDMG
 str(storm)
 ```

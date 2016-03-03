@@ -160,7 +160,7 @@ str(storm.data)</code></pre>
 ##  $ REMARKS   : chr  &quot;&quot; &quot;&quot; &quot;&quot; &quot;&quot; ...
 ##  $ REFNUM    : num  1 2 3 4 5 6 7 8 9 10 ...</code></pre>
 <p>We are going to look at health and economic impacts of each events arcoss US. So we will need only a few columns from the data - FATALITIES, INJURIES, PROPDMG, PROPDMGEXP, CROPDMG, CROPDMGEXP. We will also select Date information - we chose BGN_DATE - along with event type - EVTYPE.</p>
-<p>Also column types are modified. We created a date column, the info of which is coming from BGN_DATE column. Also EVTTYPE column becomes factor.</p>
+<p>Also column types are modified. We created a date column, the info of which is coming from BGN_DATE column. From this date colume, year column is created. Also EVTTYPE column becomes factor.</p>
 <pre class="r"><code>columns &lt;- c(2,8,23:28)
 storm &lt;- storm.data[,columns]
 str(storm)</code></pre>
@@ -174,6 +174,7 @@ str(storm)</code></pre>
 ##  $ CROPDMG   : num  0 0 0 0 0 0 0 0 0 0 ...
 ##  $ CROPDMGEXP: chr  &quot;&quot; &quot;&quot; &quot;&quot; &quot;&quot; ...</code></pre>
 <pre class="r"><code>storm$date &lt;- as.Date(storm$BGN_DATE, &quot;%m/%d/%Y %H:%M:%S&quot;)
+storm$year &lt;- strftime(storm$date, &quot;%Y&quot;)
 storm$EVTYPE &lt;- as.factor(storm$EVTYPE)</code></pre>
 <p>Make Property Damage (PROPDMG) and Crop Damage (CROPDMG) columns as full number, using PROPDMGEXP and CROPDMGEXP (“K” for thousand, “M” for million, “B” for billion, all others are ignored). Then select only necessary columns.</p>
 <pre class="r"><code>storm &lt;- transform(storm, PROPDMG = ifelse(PROPDMGEXP == &quot;K&quot;, PROPDMG * 1E3, 
@@ -184,15 +185,18 @@ storm &lt;- transform(storm, CROPDMG = ifelse(CROPDMGEXP == &quot;K&quot;, CROPD
                                            ifelse(CROPDMGEXP == &quot;M&quot;, CROPDMG * 1E6, 
                                                   ifelse(CROPDMGEXP == &quot;B&quot;, 
                                                          CROPDMG * 1E9, CROPDMG))))
-storm &lt;- subset(storm, select = c(&quot;date&quot;, &quot;EVTYPE&quot;, &quot;FATALITIES&quot;, &quot;INJURIES&quot;, &quot;PROPDMG&quot;, &quot;CROPDMG&quot;))
+storm &lt;- subset(storm, select = c(&quot;date&quot;, &quot;year&quot;, &quot;EVTYPE&quot;, &quot;FATALITIES&quot;, &quot;INJURIES&quot;, &quot;PROPDMG&quot;, &quot;CROPDMG&quot;))
+storm$total.dmg &lt;- storm$PROPDMG + storm$CROPDMG
 str(storm)</code></pre>
-<pre><code>## 'data.frame':    902297 obs. of  6 variables:
+<pre><code>## 'data.frame':    902297 obs. of  8 variables:
 ##  $ date      : Date, format: &quot;1950-04-18&quot; &quot;1950-04-18&quot; ...
+##  $ year      : chr  &quot;1950&quot; &quot;1950&quot; &quot;1951&quot; &quot;1951&quot; ...
 ##  $ EVTYPE    : Factor w/ 985 levels &quot;   HIGH SURF ADVISORY&quot;,..: 834 834 834 834 834 834 834 834 834 834 ...
 ##  $ FATALITIES: num  0 0 0 0 0 0 0 0 1 0 ...
 ##  $ INJURIES  : num  15 0 2 2 2 6 1 0 14 0 ...
 ##  $ PROPDMG   : num  25000 2500 25000 2500 2500 2500 2500 2500 25000 25000 ...
-##  $ CROPDMG   : num  0 0 0 0 0 0 0 0 0 0 ...</code></pre>
+##  $ CROPDMG   : num  0 0 0 0 0 0 0 0 0 0 ...
+##  $ total.dmg : num  25000 2500 25000 2500 2500 2500 2500 2500 25000 25000 ...</code></pre>
 </div>
 
 
