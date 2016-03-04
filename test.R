@@ -21,3 +21,8 @@ storm <- subset(storm, select = c("date", "year", "EVTYPE", "FATALITIES", "INJUR
 storm$total.dmg <- storm$PROPDMG + storm$CROPDMG
 str(storm)
 
+library(dplyr)
+library(lattice)
+storm.by.year.evt <- group_by(storm, year, EVTYPE)
+sum.dmg.by.year.evt <- summarise(storm.by.year.evt, sum.dmg = sum(total.dmg))
+head(sum.dmg.by.year.evt)
