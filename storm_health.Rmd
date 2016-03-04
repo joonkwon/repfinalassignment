@@ -45,3 +45,54 @@ storm <- subset(storm, select = c("date", "year", "EVTYPE", "FATALITIES", "INJUR
 storm$total.dmg <- storm$PROPDMG + storm$CROPDMG
 str(storm)
 ```
+
+Group storm data by year and event type and compute the total dmage by the group
+```{r}
+library(dplyr)
+storm.by.year.evt <- group_by(storm, year, EVTYPE)
+sum.dmg.by.year.evt <- summarise(storm.by.year.evt, sum.dmg = sum(total.dmg))
+head(sum.dmg.by.year.evt)
+dim(sum.dmg.by.year.evt)
+```
+Dimension of sum.dmg.by.year.evt shows that there are 2326 events. We will focus on 10 events that caused most damages
+
+Calculate total sum of damage and order them from the top so that we can select only the top 10 events.
+
+```{r}
+s <- group_by(sum.dmg.by.year.evt, EVTYPE)
+ss <- summarise(s, total.dmg = sum(sum.dmg))
+top10evt <- ss[order(ss$total.dmg, decreasing = TRUE),]$EVTYPE[1:10]
+```
+Select rows from s that belong to top10evt 
+```{r}
+dmg.top <- s[s$EVTYPE %in% top10evt,]
+```
+
+Plot dmg.by.top event so that shows dmg by each event at each year. However here, the largest damge is a rather large compared to  others so we limit the y range, which help us to better compare other events.
+
+Top 10 largest damage:
+```{r}
+dmg.top[order(dmg.top$sum.dmg, decreasing = TRUE),]
+```
+
+Reduced y range - this is to zoom in to the busy area.
+```{r message= FALSE}
+library(ggplot2)
+```
+```{r}
+g <- ggplot(dmg.top, aes(as.numeric(year), sum.dmg, colour=EVTYPE))
+g + ylim(0, 6E10) + geom_line()
+```
+This plot show before early 1990s, only tornado was the event that caused a significant damage. We suspect that not enough data may have been collected befor that time. So we decided make comparison only after that time. In order to find the exact year where more data became available. We sorted dmg.top data by year and cut the data from 1985 to 1995.
+
+```{r}
+dmg.top.order.year <- dmg.top[order(as.numeric(dmg.top$year)),]
+zoom <- dmg.top.order.year[dmg.top.order.year$year > 1985 & dmg.top.order.year$year < 1995,]
+as.data.frame(zoom)
+```
+
+```{r}
+dmg.ext <- subset(dmg.top, as.numeric(year) > 1992)
+g <- ggplot(dmg.ext, aes(as.numeric(year), sum.dmg, colour=EVTTYPE))
+g+geom_line()
+```
