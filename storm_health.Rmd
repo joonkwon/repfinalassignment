@@ -46,53 +46,116 @@ storm$total.dmg <- storm$PROPDMG + storm$CROPDMG
 str(storm)
 ```
 
-Group storm data by year and event type and compute the total dmage by the group
-```{r}
+Load dplyr library
+
+```{r message=FALSE}
 library(dplyr)
+```
+
+Group storm data by year and event type and compute the total dmage by the group
+```{r cache=TRUE}
 storm.by.year.evt <- group_by(storm, year, EVTYPE)
-sum.dmg.by.year.evt <- summarise(storm.by.year.evt, sum.dmg = sum(total.dmg))
-head(sum.dmg.by.year.evt)
-dim(sum.dmg.by.year.evt)
-```
-Dimension of sum.dmg.by.year.evt shows that there are 2326 events. We will focus on 10 events that caused most damages
-
-Calculate total sum of damage and order them from the top so that we can select only the top 10 events.
-
-```{r}
-s <- group_by(sum.dmg.by.year.evt, EVTYPE)
-ss <- summarise(s, total.dmg = sum(sum.dmg))
-top10evt <- ss[order(ss$total.dmg, decreasing = TRUE),]$EVTYPE[1:10]
-```
-Select rows from s that belong to top10evt 
-```{r}
-dmg.top <- s[s$EVTYPE %in% top10evt,]
+storm.by.year.evt
 ```
 
-Plot dmg.by.top event so that shows dmg by each event at each year. However here, the largest damge is a rather large compared to  others so we limit the y range, which help us to better compare other events.
+# 10 Most Economically Damaging Events
 
-Top 10 largest damage:
-```{r}
-dmg.top[order(dmg.top$sum.dmg, decreasing = TRUE),]
+We compute total damage for each event at each year.
+
+```{r cache=TRUE}
+sum.dmg<- summarise(storm.by.year.evt, sum.dmg = sum(total.dmg))
+head(sum.dmg)
+dim(sum.dmg)
+length(unique(sum.dmg$EVTYPE))
 ```
 
-Reduced y range - this is to zoom in to the busy area.
-```{r message= FALSE}
+Dimension of sum.dmg shows that there are 2326 event and year combinations over 985 different event types.  We will look at top 10 economically most sever events in terms of average damage an event cause through all the years. 
+
+We compute mean damage across year by event type. For this, first we group sum.dmg by event type. Then we compute mean damage for each event using summarise. Next we order the output, mean.dmg.by.evt, descendingly by mean value.
+
+
+```{r cache=TRUE}
+sum.dmg.by.evt <- group_by(sum.dmg, EVTYPE)
+mean.dmg.by.evt <- summarise(sum.dmg.by.evt, dmg = mean(sum.dmg))
+mean.dmg.by.evt <- mean.dmg.by.evt[order(mean.dmg.by.evt$dmg, decreasing = TRUE),]
+mean.dmg.by.evt
+```
+
+Load ggplot2 library for plotting.
+Take only top 10 most severe damage in its cost. Plot them in bar graph
+
+```{r message=FALSE}
 library(ggplot2)
 ```
-```{r}
-g <- ggplot(dmg.top, aes(as.numeric(year), sum.dmg, colour=EVTYPE))
-g + ylim(0, 6E10) + geom_line()
-```
-This plot show before early 1990s, only tornado was the event that caused a significant damage. We suspect that not enough data may have been collected befor that time. So we decided make comparison only after that time. In order to find the exact year where more data became available. We sorted dmg.top data by year and cut the data from 1985 to 1995.
 
 ```{r}
-dmg.top.order.year <- dmg.top[order(as.numeric(dmg.top$year)),]
-zoom <- dmg.top.order.year[dmg.top.order.year$year > 1985 & dmg.top.order.year$year < 1995,]
-as.data.frame(zoom)
+mean.dmg.top <- mean.dmg.by.evt[1:10,]
+mean.dmg.top$dmg <- mean.dmg.top$dmg / 1e6
+g <- ggplot(mean.dmg.top, aes(x=EVTYPE, y=dmg))
+g + geom_bar(stat="identity", fill="green") +  
+    theme(axis.text.x = element_text(angle = 90, hjust=1)) +
+    geom_text(aes(label=paste(sprintf( "%1.0f", dmg), "M" ), y=dmg + 700, colour = "pink" ),
+              size = 3, show.legend = FALSE) +
+    xlab("Event Type") +ylab("Cost of Damage (Million)")
 ```
 
+### Result
+According to above bar chart, hurricane/typhoon caused, on average, the most economic damages each year. There are hurricane and hurricane opal events too, 8th and third highest respectively. These two can be considered as one of hurricane/typhoon events too.
+
+# Injuries and Fatalities caused by Storm
+
+```{r cache=TRUE}
+sum.inj.fat <- summarise(storm.by.year.evt, total.injuries=sum(INJURIES), total.fatalities = sum(FATALITIES))
+sum.inj.fat
+```
+
+Group the above by event type then calculate year average count of injuries and fatalities for each event
+
+```{r cache=TRUE}
+inj.fat.by.event <- group_by(sum.inj.fat, EVTYPE)
+inj.fat.by.event
+mean.inj.fat <- summarise(inj.fat.by.event, mean.inj = mean(total.injuries), 
+                                   mean.fat = mean(total.fatalities))
+mean.inj.fat.sort.by.fat <- mean.inj.fat[order(mean.inj.fat$mean.fat, decreasing = TRUE),]
+mean.inj.fat.sort.by.inj <- mean.inj.fat[order(mean.inj.fat$mean.inj, decreasing = TRUE),]
+ 
+mean.inj.fat.sort.by.inj
+mean.inj.fat.sort.by.fat
+
+```
+We will extract top 10 events that cause most injuries and fatalities and create a union of those events.
+
+```{r cache=TRUE}
+top.inj <- mean.inj.fat.sort.by.inj[1:10,]$EVTYPE
+top.fat <- mean.inj.fat.sort.by.fat[1:10,]$EVTYPE
+top.inj.fat.evt <- union(top.inj, top.fat)
+top.inj.fat.evt
+```
+We got 15 events from the union. We make a data frame with average count from the events.
+
+```{r cache=TRUE}
+top.inj.fat <- mean.inj.fat[mean.inj.fat$EVTYPE %in% top.inj.fat.evt,]
+top.inj.fat
+```
+
+We make top.inj.fat to a tidy dataset using tidyr package.
+```{r message=FALSE}
+library(tidyr)
+```
+```{r cache=TRUE}
+top.evt <- gather(top.inj.fat, "type", "count", 2:3)
+top.evt$type <- as.factor(top.evt$type)
+top.evt
+```
 ```{r}
-dmg.ext <- subset(dmg.top, as.numeric(year) > 1992)
-g <- ggplot(dmg.ext, aes(as.numeric(year), sum.dmg, colour=EVTTYPE))
-g+geom_line()
+g <- ggplot(top.evt, aes(EVTYPE,count,fill=type))
+g + theme(axis.text.x = element_text(angle = 90, hjust=1)) +
+    geom_bar(stat="identity", position="dodge")
+```
+
+# Information on Current R Environment
+
+Below is our R enviromental information:
+```{r}
+sessionInfo()
 ```
