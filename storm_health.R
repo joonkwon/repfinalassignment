@@ -84,16 +84,31 @@ top.inj.fat
 
 ## ----message=FALSE-------------------------------------------------------
 library(tidyr)
+library(plyr)
 
 ## ----cache=TRUE----------------------------------------------------------
 top.evt <- gather(top.inj.fat, "type", "count", 2:3)
 top.evt$type <- as.factor(top.evt$type)
 top.evt
 
-## ------------------------------------------------------------------------
+## ----cache=TRUE----------------------------------------------------------
 g <- ggplot(top.evt, aes(EVTYPE,count,fill=type))
 g + theme(axis.text.x = element_text(angle = 90, hjust=1)) +
-    geom_bar(stat="identity", position="dodge")
+    geom_bar(stat="identity", position="dodge") +
+    geom_text(aes(label=sprintf( "%1.0f", count),y = count + 50),position=position_dodge(width=1), size=2.5) +
+    scale_fill_discrete(name="", breaks=c("mean.fat", "mean.inj"), labels=c("fatalities","injuries")) +
+    xlab("Event") + ylab("Mean Count")
+
+## ----cache=TRUE----------------------------------------------------------
+top.evt <- ddply(top.evt, "EVTYPE", transform, label_height = cumsum(count) - count / 2 )
+
+## ----cache=TRUE----------------------------------------------------------
+g <- ggplot(top.evt, aes(EVTYPE,count,fill=type))
+g + theme(axis.text.x = element_text(angle = 90, hjust=1)) +
+    geom_bar(stat="identity", position="stack") +
+    geom_text(aes(label=sprintf( "%1.0f", count), y = label_height), size=2.2) +
+    scale_fill_discrete(name="", breaks=c("mean.fat", "mean.inj"), labels=c("fatalities","injuries")) +
+    xlab("Event") + ylab("Mean Count")
 
 ## ------------------------------------------------------------------------
 sessionInfo()
