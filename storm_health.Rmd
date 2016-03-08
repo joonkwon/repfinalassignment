@@ -12,7 +12,7 @@ The data file (repdata-data-StormData.csv) includes the storm data from 1950 to 
 * National Weather Service [Storm Data Documentation](https://d396qusza40orc.cloudfront.net/repdata%2Fpeer2_doc%2Fpd01016005curr.pdf) 
 * National Climatic Data Center Storm Events [FAQ](https://d396qusza40orc.cloudfront.net/repdata%2Fpeer2_doc%2FNCDC%20Storm%20Events-FAQ%20Page.pdf)
 
-```{r cache=TRUE}
+```{r cache=FALSE}
 storm.data <- read.csv("repdata-data-StormData.csv", stringsAsFactors = FALSE)
 str(storm.data)
 ```
@@ -21,7 +21,7 @@ We are going to look at health and economic impacts of each events arcoss US. So
 
 Also column types are modified. We created a date column, the info of which is coming from BGN_DATE column. From this date colume, year column is created. Also EVTTYPE column becomes factor.
 
-```{r cache=TRUE}
+```{r cache=FALSE}
 columns <- c(2,8,23:28)
 storm <- storm.data[,columns]
 str(storm)
@@ -34,7 +34,7 @@ storm$EVTYPE <- as.factor(storm$EVTYPE)
 Make Property Damage (PROPDMG) and Crop Damage (CROPDMG) columns as full number, using PROPDMGEXP and CROPDMGEXP ("K" for thousand, "M" for million, "B" for billion, all others are ignored).
 Then select only necessary columns.
 
-```{r cache=TRUE}
+```{r cache=FALSE}
 storm <- transform(storm, PROPDMG = ifelse(PROPDMGEXP == "K", PROPDMG * 1E3, 
                                            ifelse(PROPDMGEXP == "M", PROPDMG * 1E6, 
                                                   ifelse(PROPDMGEXP == "B", 
@@ -55,18 +55,108 @@ library(dplyr)
 ```
 
 Group storm data by year and event type and compute the total dmage by the group
-```{r cache=TRUE}
+```{r cache=FALSE}
 storm.by.year.evt <- group_by(storm, year, EVTYPE)
 storm.by.year.evt
 ```
+
+Prepare data frames that will be used for the next analysis
+```{r cache=FALSE}
+sum.inj.fat <- summarise(storm.by.year.evt, total.injuries=sum(INJURIES), total.fatalities = sum(FATALITIES))
+sum.inj.fat
+
+sum.dmg<- summarise(storm.by.year.evt, sum.dmg = sum(total.dmg))
+head(sum.dmg)
+```
+
+# Injuries and Fatalities caused by Storm
+We calculate the total injury and fatality count of each event for every year.
+
+
+
+Group the above by event type then calculate yearly average count of injuries and fatalities for each event
+
+```{r cache=FALSE}
+inj.fat.by.event <- group_by(sum.inj.fat, EVTYPE)
+inj.fat.by.event
+mean.inj.fat <- summarise(inj.fat.by.event, mean.inj = mean(total.injuries), 
+                                   mean.fat = mean(total.fatalities))
+mean.inj.fat.sort.by.fat <- mean.inj.fat[order(mean.inj.fat$mean.fat, decreasing = TRUE),]
+mean.inj.fat.sort.by.inj <- mean.inj.fat[order(mean.inj.fat$mean.inj, decreasing = TRUE),]
+ 
+mean.inj.fat.sort.by.inj
+mean.inj.fat.sort.by.fat
+
+```
+We will extract top 10 events that cause, on average, most injuries and fatalities and create a union of those events. We decided to use union since the events that caused most injury and most fatality are slightly different.
+
+```{r cache=FALSE}
+top.inj <- mean.inj.fat.sort.by.inj[1:10,]$EVTYPE
+top.fat <- mean.inj.fat.sort.by.fat[1:10,]$EVTYPE
+top.inj.fat.evt <- union(top.inj, top.fat)
+top.inj.fat.evt
+```
+We got 15 events from the union. We make a data frame with average count from the events.
+
+```{r cache=FALSE}
+top.inj.fat <- mean.inj.fat[mean.inj.fat$EVTYPE %in% top.inj.fat.evt,]
+top.inj.fat
+```
+
+We make top.inj.fat to a tidy dataset using tidyr package. plyr package will be later used for stacked bar chart. We did this in order to create a stacked bar chart to compare total count of injuries and fatalities among events.
+```{r message=FALSE}
+library(tidyr)
+library(plyr)
+```
+```{r cache=FALSE}
+top.evt <- gather(top.inj.fat, "type", "count", 2:3)
+top.evt$type <- as.factor(top.evt$type)
+top.evt
+```
+
+Load ggplot2 library for plotting.
+
+
+```{r message=FALSE}
+library(ggplot2)
+```
+
+```{r cache=FALSE}
+g <- ggplot(top.evt, aes(EVTYPE,count,fill=type))
+g + theme(axis.text.x = element_text(angle = 90, hjust=1)) +
+    geom_bar(stat="identity", position="dodge") +
+    geom_text(aes(label=sprintf( "%1.0f", count),y = count + 50),position=position_dodge(width=1), size=2.5) +
+    scale_fill_discrete(name="", breaks=c("mean.fat", "mean.inj"), labels=c("fatalities","injuries")) +
+    xlab("Event") + ylab("Mean Count")
+```
+
+
+Tornado caused most injuries and Excessive Heat cause the most fatalities. The impact of Excessive heat is more apparent when we consider "Extreme Heat", "Heat" and "Heat Wave". All threes are heat-related events and each caused a significant number of fatalities.
+
+```{r cache=TRUE}
+top.evt <- ddply(top.evt, "EVTYPE", transform, label_height = cumsum(count) - count / 2 )
+```
+
+```{r cache=FALSE}
+g <- ggplot(top.evt, aes(EVTYPE,count,fill=type))
+g + theme(axis.text.x = element_text(angle = 90, hjust=1)) +
+    geom_bar(stat="identity", position="stack") +
+    geom_text(aes(label=sprintf( "%1.0f", count), y = label_height), size=2.2) +
+    scale_fill_discrete(name="", breaks=c("mean.fat", "mean.inj"), labels=c("fatalities","injuries")) +
+    xlab("Event") + ylab("Mean Count")
+```
+
+### Result
+Stacked bar charts shows that Tornado is the event that has the biggest impact on injuries and fatalities combined. However, if we consider only fatalities, heat-related event has the biggest impact.
+
+# Final Result
+According to our analysis, each year, on average, Hurricane/Typhoon causes the most economic damage and Tornado causes the most combined injuries and fatalities. However, when only the number of fatalities considered, heat related events causes the most.
 
 # 10 Most Economically Damaging Events
 
 We compute total damage for each event at each year.
 
-```{r cache=TRUE}
-sum.dmg<- summarise(storm.by.year.evt, sum.dmg = sum(total.dmg))
-head(sum.dmg)
+```{r cache=FALSE}
 dim(sum.dmg)
 length(unique(sum.dmg$EVTYPE))
 ```
@@ -76,19 +166,16 @@ Dimension of sum.dmg shows that there are 2326 event and year combinations over 
 We compute mean damage across year by event type. For this, first we group sum.dmg by event type. Then we compute mean damage for each event using summarise. Next we order the output, mean.dmg.by.evt, descendingly by mean value.
 
 
-```{r cache=TRUE}
+```{r cache=FALSE}
 sum.dmg.by.evt <- group_by(sum.dmg, EVTYPE)
 mean.dmg.by.evt <- summarise(sum.dmg.by.evt, dmg = mean(sum.dmg))
 mean.dmg.by.evt <- mean.dmg.by.evt[order(mean.dmg.by.evt$dmg, decreasing = TRUE),]
 mean.dmg.by.evt
 ```
 
-Load ggplot2 library for plotting.
-Take only top 10 most severe damage in its cost. Plot them in bar graph
 
-```{r message=FALSE}
-library(ggplot2)
-```
+Take only top 10 most severe damage in its cost. Plot them in bar graph using ggplot2
+
 
 ```{r}
 mean.dmg.top <- mean.dmg.by.evt[1:10,]
@@ -104,82 +191,7 @@ g + geom_bar(stat="identity", fill="green") +
 ### Result
 According to above bar chart, hurricane/typhoon caused, on average, the most economic damages each year. There are hurricane and hurricane opal events too, 8th and third highest respectively. These two can be considered as one of hurricane/typhoon events too.
 
-# Injuries and Fatalities caused by Storm
-We calculate the total injury and fatality count of each event for every year.
 
-```{r cache=TRUE}
-sum.inj.fat <- summarise(storm.by.year.evt, total.injuries=sum(INJURIES), total.fatalities = sum(FATALITIES))
-sum.inj.fat
-```
-
-Group the above by event type then calculate yearly average count of injuries and fatalities for each event
-
-```{r cache=TRUE}
-inj.fat.by.event <- group_by(sum.inj.fat, EVTYPE)
-inj.fat.by.event
-mean.inj.fat <- summarise(inj.fat.by.event, mean.inj = mean(total.injuries), 
-                                   mean.fat = mean(total.fatalities))
-mean.inj.fat.sort.by.fat <- mean.inj.fat[order(mean.inj.fat$mean.fat, decreasing = TRUE),]
-mean.inj.fat.sort.by.inj <- mean.inj.fat[order(mean.inj.fat$mean.inj, decreasing = TRUE),]
- 
-mean.inj.fat.sort.by.inj
-mean.inj.fat.sort.by.fat
-
-```
-We will extract top 10 events that cause, on average, most injuries and fatalities and create a union of those events. We decided to use union since the events that caused most injury and most fatality are slightly different.
-
-```{r cache=TRUE}
-top.inj <- mean.inj.fat.sort.by.inj[1:10,]$EVTYPE
-top.fat <- mean.inj.fat.sort.by.fat[1:10,]$EVTYPE
-top.inj.fat.evt <- union(top.inj, top.fat)
-top.inj.fat.evt
-```
-We got 15 events from the union. We make a data frame with average count from the events.
-
-```{r cache=TRUE}
-top.inj.fat <- mean.inj.fat[mean.inj.fat$EVTYPE %in% top.inj.fat.evt,]
-top.inj.fat
-```
-
-We make top.inj.fat to a tidy dataset using tidyr package. plyr package will be later used for stacked bar chart. We did this in order to create a stacked bar chart to compare total count of injuries and fatalities among events.
-```{r message=FALSE}
-library(tidyr)
-library(plyr)
-```
-```{r cache=TRUE}
-top.evt <- gather(top.inj.fat, "type", "count", 2:3)
-top.evt$type <- as.factor(top.evt$type)
-top.evt
-```
-```{r cache=TRUE}
-g <- ggplot(top.evt, aes(EVTYPE,count,fill=type))
-g + theme(axis.text.x = element_text(angle = 90, hjust=1)) +
-    geom_bar(stat="identity", position="dodge") +
-    geom_text(aes(label=sprintf( "%1.0f", count),y = count + 50),position=position_dodge(width=1), size=2.5) +
-    scale_fill_discrete(name="", breaks=c("mean.fat", "mean.inj"), labels=c("fatalities","injuries")) +
-    xlab("Event") + ylab("Mean Count")
-```
-
-Tornado caused most injuries and Excessive Heat cause the most fatalities. The impact of Excessive heat is more apparent when we consider "Extreme Heat", "Heat" and "Heat Wave". All threes are heat-related events and each caused a significant number of fatalities.
-
-```{r cache=TRUE}
-top.evt <- ddply(top.evt, "EVTYPE", transform, label_height = cumsum(count) - count / 2 )
-```
-
-```{r cache=TRUE}
-g <- ggplot(top.evt, aes(EVTYPE,count,fill=type))
-g + theme(axis.text.x = element_text(angle = 90, hjust=1)) +
-    geom_bar(stat="identity", position="stack") +
-    geom_text(aes(label=sprintf( "%1.0f", count), y = label_height), size=2.2) +
-    scale_fill_discrete(name="", breaks=c("mean.fat", "mean.inj"), labels=c("fatalities","injuries")) +
-    xlab("Event") + ylab("Mean Count")
-```
-
-### Result
-Stacked bar charts shows that Tornado is the event that has the biggest impact on injuries and fatalities combined. However, if we consider only fatalities, heat-related event has the biggest impact.
-
-# Final Result
-According to our analysis, each year, on average, Hurricane/Typhoon causes the most economic damage and Tornado causes the most combined injuries and fatalities. However, when only the number of fatalities considered, heat related events causes the most.
 
 
 # Information on Current R Environment
