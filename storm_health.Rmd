@@ -2,6 +2,8 @@
 title: "Storm's Health and Economic Impacts"
 output: html_document
 ---
+# Synopsis
+We will analyse NOAA storm data that is collected from 1950 to 2011. Through the analysis, we will examine which event causes the most economic damages and which event has the most health impact by year. In order to see the yearly impacts of events, We will calculate yearly mean damages and yearly mean count of fatalities and injuries caused by each event.
 
 # Loading and Processing Raw Data
 This data is coming from U.S. National Oceanic and Atmospheric Adminstraion's (NOAA) storm database. This database tracks characteristics of major storms and weather events in the United States, including when and where they occur, as well as estimates of any fatalities, injuries, and property damage.
@@ -68,10 +70,11 @@ head(sum.dmg)
 ```
 
 # Injuries and Fatalities caused by Storm
+We calculate the total injury and fatality count of each event for every year.
 
 
 
-Group the above by event type then calculate year average count of injuries and fatalities for each event
+Group the above by event type then calculate yearly average count of injuries and fatalities for each event
 
 ```{r cache=FALSE}
 inj.fat.by.event <- group_by(sum.inj.fat, EVTYPE)
@@ -85,7 +88,7 @@ mean.inj.fat.sort.by.inj
 mean.inj.fat.sort.by.fat
 
 ```
-We will extract top 10 events that cause most injuries and fatalities and create a union of those events.
+We will extract top 10 events that cause, on average, most injuries and fatalities and create a union of those events. We decided to use union since the events that caused most injury and most fatality are slightly different.
 
 ```{r cache=FALSE}
 top.inj <- mean.inj.fat.sort.by.inj[1:10,]$EVTYPE
@@ -100,7 +103,7 @@ top.inj.fat <- mean.inj.fat[mean.inj.fat$EVTYPE %in% top.inj.fat.evt,]
 top.inj.fat
 ```
 
-We make top.inj.fat to a tidy dataset using tidyr package. plyr package will be later used for stacked bar chart.
+We make top.inj.fat to a tidy dataset using tidyr package. plyr package will be later used for stacked bar chart. We did this in order to create a stacked bar chart to compare total count of injuries and fatalities among events.
 ```{r message=FALSE}
 library(tidyr)
 library(plyr)
@@ -127,7 +130,10 @@ g + theme(axis.text.x = element_text(angle = 90, hjust=1)) +
     xlab("Event") + ylab("Mean Count")
 ```
 
-```{r cache=FALSE}
+
+Tornado caused most injuries and Excessive Heat cause the most fatalities. The impact of Excessive heat is more apparent when we consider "Extreme Heat", "Heat" and "Heat Wave". All threes are heat-related events and each caused a significant number of fatalities.
+
+```{r cache=TRUE}
 top.evt <- ddply(top.evt, "EVTYPE", transform, label_height = cumsum(count) - count / 2 )
 ```
 
@@ -139,6 +145,11 @@ g + theme(axis.text.x = element_text(angle = 90, hjust=1)) +
     scale_fill_discrete(name="", breaks=c("mean.fat", "mean.inj"), labels=c("fatalities","injuries")) +
     xlab("Event") + ylab("Mean Count")
 ```
+### Result
+Stacked bar charts shows that Tornado is the event that has the biggest impact on injuries and fatalities combined. However, if we consider only fatalities, heat-related event has the biggest impact.
+
+# Final Result
+According to our analysis, each year, on average, Hurricane/Typhoon causes the most economic damage and Tornado causes the most combined injuries and fatalities. However, when only the number of fatalities considered, heat related events causes the most.
 
 # 10 Most Economically Damaging Events
 
